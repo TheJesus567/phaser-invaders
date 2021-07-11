@@ -32,6 +32,7 @@ var enemyBullet;
 var firingTimer = 0;
 var stateText;
 var livingEnemies = [];
+var noMover
 
 var distanciaBala;
 var balaX;
@@ -41,6 +42,8 @@ var movIzquierda;
 var movDerecha;
 var disparo;
 var pendiente
+
+var diferenciaX
 
 /* Variables para IA */
 var nnNetwork, nnEntrenamiento, nnSalida, datosEntrenamiento = [];
@@ -126,8 +129,11 @@ function create() {
      2 layers ocultls: con 5 neuronas  
      output layer: 2 neuronas
      */
-    nnNetwork =  new synaptic.Architect.Perceptron(2, 5, 5, 2);
+    nnNetwork = new synaptic.Architect.Perceptron(4,15,3);
     nnEntrenamiento = new synaptic.Trainer(nnNetwork);
+
+    player.body.collideWorldBounds = true;
+
 }
 
 function createAliens() {
@@ -144,12 +150,6 @@ function createAliens() {
 
     aliens.x = 100;
     aliens.y = 50;
-
-    //  All this does is basically start the invaders moving. Notice we're moving the Group they belong to, rather than the invaders directly.
-    //var tween = game.add.tween(aliens).to({ x: 200 }, 2000, Phaser.Easing.Linear.None, true, 0, 1000, true);
-
-    //  When the tween loops it calls descend
-    //+tween.onLoop.add(descend, this);
 }
 
 function setupInvader(invader) {
@@ -171,99 +171,86 @@ function update() {
     //  Scroll the background
     starfield.tilePosition.y += 2;
 
-    //balas
-    fires = [];
+    distanciaBalaX = enemyBullets.children[0].x;
+    distanciaBalaY = enemyBullets.children[0].y; 
+    
+    distanciaNaveX = player.position.x;
+
+    diferenciaX = player.body.position.x - distanciaBalaX;
 
 
-    for (var i = 0; i < enemyBullets.length; i++) {
-        //arreglo con la posicion de la bala
-        fire = [enemyBullets.children[i].x, enemyBullets.children[i].y]
-        //console.log(fire)
+   /*  var numerador = player.position.y - enemyBullets.children[0].y; 
+    var denominador = player.position.x - enemyBullets.children[0].x; 
+    pendiente = numerador/denominador; */
 
-        //arreglo de arreglos de las posiciones de las balas
-        fires.push(fire);
-    }
+    var posx=player.position.x-enemyBullets.children[0].x; 
+    var posy=player.position.y-enemyBullets.children[0].y; 
+    //distancia entre dos puntos pitagoras
+    distanciaBala = Math.sqrt((posx*posx) + (posy*posy) );
+    //dos decimales
+    distanciaBala = distanciaBala.toFixed(2);
 
     var derecha = 0;
     var izquierda = 0;
-    var disparo = 0;
+    //var disparo = 0;
+    //console.log(distanciaBalaY)
+
 
     if (player.alive) {
-        //console.log(fires);
-        //  Reset the player, then check for movement keys
-        player.body.velocity.setTo(0, 0);
-
         
-        var distanciaMenor = Math.abs(player.position.x - aliens.children[0].x);
-        posAlien=[0, distanciaMenor];
-        for (var i = 0; i < aliens.length; i++) {
-            distancia = Math.abs(player.position.x - aliens.children[i].x);
-            if(distancia<distanciaMenor){
-                distanciaMenor = distancia;
-                posAlien=[i, distanciaMenor];
-            }
-        }
-
-        //posicion de la bala con respecto al jugador
-        for (var i = 0; i < fires.length; i++) {
-            posx=player.position.x-fires[i][0];
-            posy=player.position.y-fires[i][1];
-            //distancia entre dos puntos pitagoras
-            distanciaBala = Math.sqrt((posx*posx) + (posy*posy) );
-            //dos decimales
-            distanciaBala = distanciaBala.toFixed(2);
-
-            balaX = player.position.x - fires[i][0];
-            balaX = balaX.toFixed(2);
-            posicionActual = player.position.x;
-            
-        }
-        var numerador = 100 - fires[0][1];
-        var denominador = 300 - fires[0][0];
-        pendiente = numerador/denominador;
-        pendiente = pendiente.toFixed(2);
+        player.body.velocity.setTo(0, 0);
 
         if (modoAuto == false) {
             if (cursors.left.isDown) {
-                console.log(pendiente)
-                player.body.velocity.x = -200;
+                player.body.velocity.x = -400;
                 izquierda = 1;
                 derecha = 0;
+                noMover = 0;
             }
             else if (cursors.right.isDown) {
-                console.log(pendiente)
-                player.body.velocity.x = 200;
+                player.body.velocity.x = 400;
                 derecha = 1;
                 izquierda = 0;
+                noMover = 0;
+            }else{
+                noMover = 1;
             }
 
             //  Firing?
             if (fireButton.isDown) {
                 fireBullet();
-                disparo = 1;
+                //disparo = 1;
             }
+    
                     
             /* Se encarga las entradas y salidas */
-            datosEntrenamiento.push({
-                'input' :  [distanciaBala , pendiente],
-                'output':  [izquierda, derecha]  
-            });
+            if(distanciaBalaY > 0){
+                console.log("AQUII")
+                datosEntrenamiento.push({
+                    'input' :  [distanciaBalaY,distanciaBalaX,diferenciaX,distanciaNaveX ],
+                    'output':  [derecha, izquierda, noMover]  
+                });
+            }
+              
+            
 
         }
         else{
             console.log("IA jugando")
-            var cond = datosDeEntrenamiento( [distanciaBala , pendiente]);
+            var cond = datosDeEntrenamiento( [distanciaBalaY,distanciaBalaX,diferenciaX,distanciaNaveX]);
 
             switch(cond){
                 case 0:
+                    console.log("se movio a la izquierda")
+                    player.body.velocity.x = -400;
                     break;
                     case 1:
-                        console.log("se movio a la izquierda")
-                        player.body.velocity.x = -200;
+                        console.log("se movio a la derecha")
+                        player.body.velocity.x = 400;
                         break;
                         case 2:
-                            console.log("se movio a la derecha")
-                            player.body.velocity.x = 200;
+                            console.log("No se mueve")
+                            player.body.velocity.setTo(0, 0);
                             break;
             }
             fireBullet();
@@ -347,9 +334,6 @@ function enemyHitsPlayer(player, bullet) {
         stateText.text = " GAME OVER";
         stateText.visible = true;
 
-        //the "click to restart" handler
-        //game.input.onTap.addOnce(pausa,this);
-        //sleep(3000);
         pausa();
     }
 
@@ -378,8 +362,8 @@ function enemyFires() {
         // And fire the bullet from this enemy
         enemyBullet.reset(shooter.body.x, shooter.body.y);
 
-        game.physics.arcade.moveToObject(enemyBullet, player, 120);
-        firingTimer = game.time.now + 2000;
+        game.physics.arcade.moveToObject(enemyBullet, player, 200);
+        firingTimer = game.time.now + 1350;
     }
 
 }
@@ -489,36 +473,33 @@ function resetVariables() {
 function enRedNeural(){
     console.log("Se esta entrenando...")
     /* Aqui es donde se aprende */
-    nnEntrenamiento.train(datosEntrenamiento, {rate: 0.0003, iterations: 5000, shuffle: true});
+    nnEntrenamiento.train(datosEntrenamiento, {rate: 0.0003, iterations: 10000, shuffle: true});
 }
 //rate -> taza de aprendizaje por cada iteracion aprende
 
 
 
 function datosDeEntrenamiento(param_entrada){
-    console.log("Entrada",param_entrada[0]+" "+param_entrada[1]);
     nnSalida = nnNetwork.activate(param_entrada);
 
+    console.log("Entrada",param_entrada[0]+" "+param_entrada[1]+" "+param_entrada[2]+" "+param_entrada[3]);
+
    // console.log(nnSalida);
-    var izquierda=Math.round( nnSalida[0]*100 );
-    var derecha=Math.round( nnSalida[1]*100 );
-    console.log("Valor ","En la izquierda %: "+ izquierda + " En la derecha %: " + derecha );
-    if(derecha>20 && izquierda>20){
-        if(izquierda>derecha){
-            return 1;
-        }
-        else{
-            return 2;
-        }
-    }
-    else{
+   var left = Math.round( nnSalida[0]*100 );
+   var right = Math.round( nnSalida[1]*100 );
+   var noMovement = Math.round( nnSalida[2]*100 );
+   
+   console.log("Valor ","IZQUIERDA %: "+ right + " DERECHA %: " + left + " QUIETO %: " + noMovement);
+    
+    if(left>right)
+    {
         return 0;
+    }else if (right > left)
+    {
+        return 1;
+    }else{
+        return 2
     }
-    /*console.log("Entrada",param_entrada[0]+" "+param_entrada[1]);
-    nnSalida = nnNetwork.activate(param_entrada);
-    var aire=Math.round( nnSalida[0]*100 );
-    var piso=Math.round( nnSalida[1]*100 );
-    console.log("Valor ","En el Aire %: "+ aire + " En el suelo %: " + piso );
-    return nnSalida[0]>=nnSalida[1];*/
+
 }
 
